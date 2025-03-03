@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,30 +13,78 @@ export default function SendEmailPage() {
   const [cc, setCc] = useState<string[]>([""]);
   const [bcc, setBcc] = useState<string[]>([""]);
   
+  // State for form status
+  const [status, setStatus] = useState<{
+    message: string;
+    type: "success" | "error" | "none";
+  }>({
+    message: "",
+    type: "none",
+  });
+  
+  const router = useRouter();
+  
   // Handle form submission
   const handleSubmit = async (formData: FormData) => {
-    // This would be replaced with actual form submission logic
-    const subject = formData.get("subject") as string;
-    const sender = formData.get("sender") as string;
-    
-    // Filter out empty emails
-    const filteredRecipients = recipients.filter(email => email.trim() !== "");
-    const filteredCc = cc.filter(email => email.trim() !== "");
-    const filteredBcc = bcc.filter(email => email.trim() !== "");
-    
-    const body = formData.get("body") as string;
-    
-    // Log the form data for now
-    console.log({
-      subject,
-      sender,
-      recipients: filteredRecipients,
-      cc: filteredCc,
-      bcc: filteredBcc,
-      body
-    });
-    
-    // Here you would typically send this data to your backend
+    try {
+      setStatus({ message: "", type: "none" });
+      
+      const subject = formData.get("subject") as string;
+      const sender = formData.get("sender") as string;
+      
+      // Filter out empty emails
+      const filteredRecipients = recipients.filter(email => email.trim() !== "");
+      const filteredCc = cc.filter(email => email.trim() !== "");
+      const filteredBcc = bcc.filter(email => email.trim() !== "");
+      
+      const body = formData.get("body") as string;
+      
+      // Prepare the data for the API
+      const emailData = {
+        subject,
+        sender,
+        recipients: filteredRecipients,
+        cc: filteredCc,
+        bcc: filteredBcc,
+        body
+      };
+      
+      // Send the data to the API
+      const response = await fetch('/api/store-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(emailData),
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to store email');
+      }
+      
+      // Show success message
+      setStatus({
+        message: "Email stored successfully!",
+        type: "success",
+      });
+      
+      // Refresh the page data
+      router.refresh();
+      
+      // Reset form fields if needed
+      // setRecipients([""]);
+      // setCc([""]);
+      // setBcc([""]);
+      
+    } catch (error) {
+      console.error('Error storing email:', error);
+      setStatus({
+        message: error instanceof Error ? error.message : "An unexpected error occurred",
+        type: "error",
+      });
+    }
   };
   
   // Helper function to add a new email field
@@ -77,6 +126,14 @@ export default function SendEmailPage() {
         <h1 className="text-3xl font-bold mb-6">Send Email</h1>
         
         <form action={handleSubmit} className="space-y-6">
+          {/* Status message */}
+          {status.type !== "none" && (
+            <div className={`p-4 rounded-md ${
+              status.type === "success" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+            }`}>
+              {status.message}
+            </div>
+          )}
           {/* Subject */}
           <div className="space-y-2">
             <Label htmlFor="subject">Subject</Label>
