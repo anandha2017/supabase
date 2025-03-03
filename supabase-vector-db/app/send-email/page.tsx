@@ -17,6 +17,7 @@ export default function SendEmailPage() {
   const [status, setStatus] = useState<{
     message: string;
     type: "success" | "error" | "none";
+    details?: string[];
   }>({
     message: "",
     type: "none",
@@ -61,7 +62,12 @@ export default function SendEmailPage() {
       const result = await response.json();
       
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to store email');
+        // Handle validation errors with details
+        if (result.details && Array.isArray(result.details)) {
+          throw new Error(result.error, { cause: result.details });
+        } else {
+          throw new Error(result.error || 'Failed to store email');
+        }
       }
       
       // Show success message
@@ -80,9 +86,16 @@ export default function SendEmailPage() {
       
     } catch (error) {
       console.error('Error storing email:', error);
+      
+      // Check if we have validation details
+      const details = error instanceof Error && error.cause ? 
+        Array.isArray(error.cause) ? error.cause : [String(error.cause)] : 
+        undefined;
+      
       setStatus({
         message: error instanceof Error ? error.message : "An unexpected error occurred",
         type: "error",
+        details
       });
     }
   };
@@ -131,7 +144,14 @@ export default function SendEmailPage() {
             <div className={`p-4 rounded-md ${
               status.type === "success" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
             }`}>
-              {status.message}
+              <p className="font-semibold">{status.message}</p>
+              {status.details && status.details.length > 0 && (
+                <ul className="mt-2 list-disc list-inside">
+                  {status.details.map((detail, index) => (
+                    <li key={index}>{detail}</li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
           {/* Subject */}
